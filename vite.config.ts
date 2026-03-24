@@ -12,4 +12,16 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['pdfjs-dist'],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'pdf-vendor': ['pdfjs-dist'],
+          'ui-vendor': ['framer-motion', 'lucide-react'],
+          'db-vendor': ['dexie'],
+        },
+      },
+    },
+  },
 })
