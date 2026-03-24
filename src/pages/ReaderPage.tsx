@@ -11,7 +11,7 @@ import {
   useFitScale,
   useBookLoader,
 } from '@/features/read-pdf'
-import { useSwipeNavigation } from '@/shared/lib/hooks/useSwipeNavigation'
+import { useGestures } from '@/shared/lib/hooks/useGestures'
 import { PageRenderer, ReaderToolbar, BottomBar } from '@/widgets/reader'
 import { Sidebar } from '@/widgets/sidebar'
 import { Spinner } from '@/shared/ui/atoms/Spinner'
@@ -21,26 +21,15 @@ function parseSafeBookId(raw: string | undefined): number | null {
   return raw && !isNaN(n) && n > 0 ? n : null
 }
 
-function handleTapZone(
-  e: React.MouseEvent<HTMLDivElement>,
-  onPrev: () => void,
-  onNext: () => void,
-) {
-  if (window.getSelection()?.toString()) return
-  if (e.nativeEvent instanceof PointerEvent && e.nativeEvent.pointerType === 'mouse') return
-  const relX = (e.clientX - e.currentTarget.getBoundingClientRect().left) / e.currentTarget.offsetWidth
-  if (relX < 0.3) onPrev()
-  else if (relX > 0.7) onNext()
-}
-
 export function ReaderPage() {
   const { bookId: bookIdStr } = useParams<{ bookId: string }>()
   const navigate = useNavigate()
   const bookId = parseSafeBookId(bookIdStr)
 
-  const { pdfDocument, currentPage, scale, goToPage, reset, pdfLoadError } = useReaderStore()
+  const { pdfDocument, currentPage, scale, goToPage, setScale, reset, pdfLoadError } = useReaderStore()
   const { sidebarOpen } = useUiStore()
   const viewportRef = useRef<HTMLDivElement>(null)
+  const pageWrapperRef = useRef<HTMLDivElement>(null)
 
   const { pdfData, bookTitle, dbError } = useBookLoader(bookId)
 
@@ -49,10 +38,28 @@ export function ReaderPage() {
   useKeyboardNavigation()
   useFitScale(viewportRef)
 
-  const { onPointerDown, onPointerUp, onPointerCancel } = useSwipeNavigation(
-    () => useReaderStore.getState().goToPage(useReaderStore.getState().currentPage + 1),
-    () => useReaderStore.getState().goToPage(useReaderStore.getState().currentPage - 1),
-  )
+  const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel } = useGestures({
+    onSwipeLeft: () => goToPage(useReaderStore.getState().currentPage + 1),
+    onSwipeRight: () => goToPage(useReaderStore.getState().currentPage - 1),
+    onTap: (relX) => {
+      if (window.getSelection()?.toString()) return
+      if (relX < 0.3) goToPage(useReaderStore.getState().currentPage - 1)
+      else if (relX > 0.7) goToPage(useReaderStore.getState().currentPage + 1)
+    },
+    onPinchMove: (ratio) => {
+      if (pageWrapperRef.current) {
+        pageWrapperRef.current.style.transform = `scale(${ratio})`
+        pageWrapperRef.current.style.transformOrigin = 'center center'
+      }
+    },
+    onPinchEnd: (ratio) => {
+      if (pageWrapperRef.current) {
+        pageWrapperRef.current.style.transform = ''
+      }
+      const baseScale = useReaderStore.getState().scale
+      setScale(Math.max(0.25, Math.min(4, baseScale * ratio)))
+    },
+  })
 
   const error = dbError ?? pdfLoadError
 
@@ -87,16 +94,17 @@ export function ReaderPage() {
       <div className="flex flex-1 overflow-hidden">
         <div
           ref={viewportRef}
-          className="flex-1 flex items-center justify-center overflow-auto sm:p-6"
-          style={{ background: 'var(--color-bg)' }}
-          onClick={(e) => handleTapZone(e, () => goToPage(currentPage - 1), () => goToPage(currentPage + 1))}
+          className="flex-1 flex items-start justify-center overflow-auto sm:items-center sm:p-6"
+          style={{ background: 'var(--color-bg)', touchAction: 'pan-y' }}
           onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerCancel}
         >
           {pdfDocument && bookId ? (
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
+                ref={pageWrapperRef}
                 key={currentPage}
                 initial={{ opacity: 0, x: 16 }}
                 animate={{ opacity: 1, x: 0 }}

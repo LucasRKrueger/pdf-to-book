@@ -7,7 +7,7 @@ interface Props {
   page: PDFPageProxy | null
   scale: number
   annotations: Annotation[]
-  onAnnotationClick?: (annotation: Annotation) => void
+  onAnnotationClick?: (annotation: Annotation, e: React.MouseEvent) => void
 }
 
 export function HighlightLayer({ page, scale, annotations, onAnnotationClick }: Props) {
@@ -42,9 +42,9 @@ export function HighlightLayer({ page, scale, annotations, onAnnotationClick }: 
                 stroke={color.replace('0.35', '0.9')}
                 strokeWidth={2}
                 className="pointer-events-auto cursor-pointer"
-                onClick={() => {
+                onClick={(e) => {
                   if (ann.id != null) setActive(ann.id)
-                  onAnnotationClick?.(ann)
+                  onAnnotationClick?.(ann, e)
                 }}
               />
             )

@@ -3,9 +3,9 @@ import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import { PageCanvas } from './PageCanvas'
 import { TextLayer } from './TextLayer'
 import { HighlightLayer } from '@/entities/annotation'
-import { SelectionPopover, useAnnotations } from '@/features/highlight-text'
+import { SelectionPopover, AnnotationPopover, useAnnotations } from '@/features/highlight-text'
 import { useTextSelection } from '@/shared/lib/hooks/useTextSelection'
-import type { HighlightColor, AnnotationType, PdfRect } from '@/shared/types/annotation'
+import type { Annotation, HighlightColor, AnnotationType, PdfRect } from '@/shared/types/annotation'
 
 interface Props {
   doc: PDFDocumentProxy
@@ -14,13 +14,21 @@ interface Props {
   bookId: number
 }
 
+interface AnnotationPopoverState {
+  id: number
+  x: number
+  y: number
+}
+
 export function PageRenderer({ doc, pageNumber, scale, bookId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const textLayerRef = useRef<HTMLDivElement>(null)
   const [currentPage, setCurrentPage] = useState<PDFPageProxy | null>(null)
+  const [annotationPopover, setAnnotationPopover] = useState<AnnotationPopoverState | null>(null)
   const containerWidth = containerRef.current?.offsetWidth ?? 600
+  const containerHeight = containerRef.current?.offsetHeight ?? 800
   const { hasSelection, selectionBox, clearSelection } = useTextSelection(containerRef)
-  const { annotations, add } = useAnnotations(bookId, pageNumber)
+  const { annotations, add, remove } = useAnnotations(bookId, pageNumber)
 
   const handlePageReady = useCallback((page: PDFPageProxy) => {
     setCurrentPage(page)
@@ -44,6 +52,17 @@ export function PageRenderer({ doc, pageNumber, scale, bookId }: Props) {
     clearSelection()
   }
 
+  function handleAnnotationClick(ann: Annotation, e: React.MouseEvent) {
+    if (ann.id == null) return
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setAnnotationPopover({
+      id: ann.id,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    })
+  }
+
   return (
     <div
       ref={containerRef}
@@ -63,11 +82,21 @@ export function PageRenderer({ doc, pageNumber, scale, bookId }: Props) {
             page={currentPage}
             scale={scale}
             annotations={annotations}
-            onAnnotationClick={undefined}
+            onAnnotationClick={handleAnnotationClick}
           />
         </>
       )}
-      {hasSelection && selectionBox && currentPage && textLayerRef.current && (
+      {annotationPopover && (
+        <AnnotationPopover
+          x={annotationPopover.x}
+          y={annotationPopover.y}
+          containerWidth={containerWidth}
+          containerHeight={containerHeight}
+          onDelete={() => remove(annotationPopover.id)}
+          onDismiss={() => setAnnotationPopover(null)}
+        />
+      )}
+      {hasSelection && selectionBox && currentPage && textLayerRef.current && !annotationPopover && (
         <SelectionPopover
           selectionBox={selectionBox}
           containerWidth={containerWidth}
