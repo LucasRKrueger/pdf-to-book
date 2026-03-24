@@ -57,9 +57,9 @@ export function HighlightLayer({ page, scale, annotations, onAnnotationClick }: 
               width={rw} height={rh}
               fill={color}
               className="pointer-events-auto cursor-pointer"
-              onClick={() => {
+              onClick={(e) => {
                 if (ann.id != null) setActive(ann.id)
-                onAnnotationClick?.(ann)
+                onAnnotationClick?.(ann, e)
               }}
             />
           )
