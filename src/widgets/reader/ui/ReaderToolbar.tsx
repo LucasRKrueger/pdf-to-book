@@ -60,7 +60,7 @@ export function ReaderToolbar({ bookTitle }: Props) {
           scale={scale}
           onZoomIn={() => setScale(Math.min(4, scale + 0.15))}
           onZoomOut={() => setScale(Math.max(0.25, scale - 0.15))}
-          onFitWidth={() => setFitMode('width')}
+          onFitWidth={() => setFitMode('page')}
         />
       </div>
 

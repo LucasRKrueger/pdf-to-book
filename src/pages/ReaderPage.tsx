@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AlertCircle, ArrowLeft } from 'lucide-react'
@@ -10,6 +10,7 @@ import {
   useKeyboardNavigation,
   useFitScale,
   useBookLoader,
+  useWheelZoom,
 } from '@/features/read-pdf'
 import { useGestures } from '@/shared/lib/hooks/useGestures'
 import { PageRenderer, ReaderToolbar, BottomBar } from '@/widgets/reader'
@@ -26,7 +27,7 @@ export function ReaderPage() {
   const navigate = useNavigate()
   const bookId = parseSafeBookId(bookIdStr)
 
-  const { pdfDocument, currentPage, scale, goToPage, setScale, reset, pdfLoadError } = useReaderStore()
+  const { pdfDocument, currentPage, scale, fitMode, goToPage, setScale, reset, pdfLoadError } = useReaderStore()
   const { sidebarOpen } = useUiStore()
   const viewportRef = useRef<HTMLDivElement>(null)
   const pageWrapperRef = useRef<HTMLDivElement>(null)
@@ -37,6 +38,33 @@ export function ReaderPage() {
   useReadingPosition(bookId)
   useKeyboardNavigation()
   useFitScale(viewportRef)
+  useWheelZoom(viewportRef)
+
+  // After scale changes, wait one tick for the canvas to resize then centre the viewport.
+  // Captures vertical ratio before the tick so reading position is preserved proportionally.
+  useEffect(() => {
+    const el = viewportRef.current
+    if (!el) return
+    const maxScrollY = el.scrollHeight - el.clientHeight
+    const relY = maxScrollY > 0 ? el.scrollTop / maxScrollY : 0
+    const id = setTimeout(() => {
+      el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2)
+      const newMaxY = el.scrollHeight - el.clientHeight
+      el.scrollTop = newMaxY > 0 ? relY * newMaxY : 0
+    }, 0)
+    return () => clearTimeout(id)
+  }, [scale])
+
+  // On page turn, reset to top-centre
+  useEffect(() => {
+    const el = viewportRef.current
+    if (!el) return
+    const id = setTimeout(() => {
+      el.scrollTop = 0
+      el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2)
+    }, 0)
+    return () => clearTimeout(id)
+  }, [currentPage])
 
   const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel } = useGestures({
     onSwipeLeft: () => goToPage(useReaderStore.getState().currentPage + 1),
@@ -94,8 +122,8 @@ export function ReaderPage() {
       <div className="flex flex-1 overflow-hidden">
         <div
           ref={viewportRef}
-          className="flex-1 flex items-start justify-center overflow-auto sm:items-center sm:p-6"
-          style={{ background: 'var(--color-bg)', touchAction: 'pan-y' }}
+          className="flex-1 flex items-start overflow-auto sm:p-6"
+          style={{ background: 'var(--color-bg)', touchAction: fitMode === 'custom' ? 'auto' : 'pan-y' }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -110,7 +138,7 @@ export function ReaderPage() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -16 }}
                 transition={{ duration: 0.15 }}
-                className="shadow-2xl overflow-hidden"
+                className="shadow-2xl overflow-hidden mx-auto sm:my-auto"
                 style={{ background: '#fff', borderRadius: 2 }}
               >
                 <PageRenderer
@@ -122,7 +150,7 @@ export function ReaderPage() {
               </motion.div>
             </AnimatePresence>
           ) : (
-            <Spinner label="Loading…" />
+            <div className="mx-auto my-auto"><Spinner label="Loading…" /></div>
           )}
         </div>
 

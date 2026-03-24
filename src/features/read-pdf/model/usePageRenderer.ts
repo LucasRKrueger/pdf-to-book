@@ -22,7 +22,7 @@ export function usePageRenderer({ doc, pageNumber, scale, canvasRef, onPageReady
     const page = await doc.getPage(pageNumber)
     pageRef.current = page
 
-    const dpr = window.devicePixelRatio || 1
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
     const viewport = page.getViewport({ scale: scale * dpr })
 
     canvas.width = viewport.width

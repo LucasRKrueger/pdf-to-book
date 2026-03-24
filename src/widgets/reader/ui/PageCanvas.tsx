@@ -17,7 +17,6 @@ export function PageCanvas({ doc, pageNumber, scale, onPageReady }: Props) {
     <canvas
       ref={canvasRef}
       className="block"
-      style={{ maxWidth: '100%' }}
     />
   )
 }
